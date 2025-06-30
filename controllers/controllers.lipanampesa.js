@@ -40,7 +40,7 @@ export const initiateSTKPush = async (req, res) => {
                     PartyB: process.env.BUSINESS_SHORT_CODE,
                     PhoneNumber: phone,
                     CallBackURL: callback_url,
-                    AccountReference: "Wamaitha Online Shop",
+                    AccountReference: "Scenius Travels",
                     TransactionDesc: "Paid online",
                 },
             },
