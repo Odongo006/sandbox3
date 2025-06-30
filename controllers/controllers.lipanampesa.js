@@ -37,7 +37,7 @@ export const initiateSTKPush = async (req, res) => {
                     TransactionType: "CustomerBuyGoodsOnline",
                     Amount: amount,
                     PartyA: phone,
-                    PartyB: process.env.BUSINESS_SHORT_CODE,
+                    PartyB: process.env.TILL_NUMBER,
                     PhoneNumber: phone,
                     CallBackURL: callback_url,
                     AccountReference: "Scenius Travels",
