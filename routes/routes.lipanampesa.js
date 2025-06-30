@@ -4,8 +4,6 @@ import {
     initiateSTKPush,
     stkPushCallback,
     confirmPayment
-
-
 } from "../controllers/controllers.lipanampesa.js";
 
 
