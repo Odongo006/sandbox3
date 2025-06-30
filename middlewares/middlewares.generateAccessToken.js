@@ -7,38 +7,43 @@ export const accessToken = (req, res, next) => {
 
     request(
         {
-            url: url,
+            url,
             headers: {
-                "Authorization": "Basic " + auth
-            }
+                "Authorization": `Basic ${auth}`,
+            },
         },
         (error, response, body) => {
             if (error) {
-                console.error("Access token request error:", error);
+                console.error("Token request failed:", error);
                 return res.status(500).json({
-                    message: "Something went wrong when trying to process your payment",
-                    error: error.message
+                    message: "Failed to request token",
+                    error: error.message,
+                });
+            }
+
+            if (!body) {
+                console.error("Empty token response body");
+                return res.status(500).json({
+                    message: "Empty token response from Safaricom",
                 });
             }
 
             try {
-                if (!body) {
-                    throw new Error("Empty response body from Safaricom OAuth");
-                }
-
                 const data = JSON.parse(body);
-
                 if (!data.access_token) {
-                    throw new Error("Access token not found in response");
+                    console.error("No access token found in response:", data);
+                    return res.status(500).json({
+                        message: "No access token in Safaricom response",
+                    });
                 }
 
                 req.safaricom_access_token = data.access_token;
                 next();
-            } catch (parseError) {
-                console.error("Access token parsing error:", body);
+            } catch (err) {
+                console.error("Error parsing Safaricom response:", body);
                 return res.status(500).json({
-                    message: "Failed to parse access token response",
-                    error: parseError.message
+                    message: "Error parsing JSON from Safaricom",
+                    error: err.message,
                 });
             }
         }
