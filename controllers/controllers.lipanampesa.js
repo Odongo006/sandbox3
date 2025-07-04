@@ -10,7 +10,7 @@ import ngrok from 'ngrok';
 export const initiateSTKPush = async (req, res) => {
     try {
         const { amount, phone, Order_ID } = req.body;
-        const url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest";
+        const url = "https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest";
         const auth = "Bearer " + req.safaricom_access_token;
 
         const timestamp = getTimestamp();
@@ -40,7 +40,7 @@ export const initiateSTKPush = async (req, res) => {
                     PartyB: process.env.TILL_NUMBER,
                     PhoneNumber: phone,
                     CallBackURL: callback_url,
-                    AccountReference: "Scenius Travels",
+                    AccountReference: "Scenius Solutions",
                     TransactionDesc: "Paid online",
                 },
             },
@@ -106,7 +106,7 @@ export const stkPushCallback = async (req, res) => {
 
 export const confirmPayment = async (req, res) => {
     try {
-        const url = "https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query";
+        const url = " https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query";
         const auth = "Bearer " + req.safaricom_access_token;
 
         const timestamp = getTimestamp();
