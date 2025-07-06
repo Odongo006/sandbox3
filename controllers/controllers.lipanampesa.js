@@ -36,17 +36,17 @@ export const initiateSTKPush = async (req, res) => {
                     Authorization: auth,
                 },
                 json: {
-                    BusinessShortCode: process.env.BUSINESS_SHORT_CODE,
-                    Password: password,
-                    Timestamp: timestamp,
-                    TransactionType: "CustomerPayBillOnline", // recommended
-                    Amount: amount,
-                    PartyA: phone,
-                    PartyB: process.env.TILL_NUMBER,
-                    PhoneNumber: phone,
-                    CallBackURL: callback_url,
-                    AccountReference: "Scenius Solutions",
-                    TransactionDesc: "Paid online",
+    BusinessShortCode: process.env.BUSINESS_SHORT_CODE,
+    Password: password,
+    Timestamp: timestamp,
+    TransactionType: "CustomerBuyGoodsOnline", // ✅ BUY GOODS mode
+    Amount: amount,
+    PartyA: phone,
+    PartyB: process.env.TILL_NUMBER,
+    PhoneNumber: phone,
+    CallBackURL: callback_url,
+    AccountReference: "Scenius Solutions",
+    TransactionDesc: "Paid online",
                 },
             },
             (err, response, body) => {
