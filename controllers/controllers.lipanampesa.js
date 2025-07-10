@@ -19,7 +19,7 @@ export const initiateSTKPush = async (req, res) => {
         ).toString('base64');
 
         // Create callback URL using env NGROK_URL (recommended over ngrok.connect each time)
-        const callback_url = ${process.env.NGROK_URL}/api/stkPushCallback/${Order_ID};
+        const callback_url = `${process.env.NGROK_URL}/api/stkPushCallback/${Order_ID}`;
 
         console.log("Callback URL:", callback_url);
 
@@ -37,10 +37,10 @@ export const initiateSTKPush = async (req, res) => {
                     TransactionType: "CustomerBuyGoodsOnline",
                     Amount: amount,
                     PartyA: phone,
-                    PartyB: process.env.TILL_NUMBER,
+                    PartyB: process.env.BUSINESS_SHORT_CODE,
                     PhoneNumber: phone,
                     CallBackURL: callback_url,
-                    AccountReference: "Scenius Solutions",
+                    AccountReference: "Scenius",
                     TransactionDesc: "Paid online",
                 },
             },
@@ -106,7 +106,7 @@ export const stkPushCallback = async (req, res) => {
 
 export const confirmPayment = async (req, res) => {
     try {
-        const url = " https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query";
+        const url = "https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query";
         const auth = "Bearer " + req.safaricom_access_token;
 
         const timestamp = getTimestamp();
@@ -147,3 +147,4 @@ export const confirmPayment = async (req, res) => {
         });
     }
 };
+
