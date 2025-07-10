@@ -1,7 +1,6 @@
 import request from "request";
 import 'dotenv/config';
 import { getTimestamp } from "../Utils/utils.timestamp.js";
-import ngrok from 'ngrok';
 
 // @desc initiate stk push
 // @method POST
@@ -10,9 +9,16 @@ import ngrok from 'ngrok';
 export const initiateSTKPush = async (req, res) => {
     try {
         const { amount, phone, Order_ID } = req.body;
+
+        // Normalize phone to 2547XXXXXXXX
+        const normalizedPhone = phone.startsWith("0")
+            ? "254" + phone.slice(1)
+            : phone.startsWith("+254")
+            ? phone.slice(1)
+            : phone;
+
         const url = "https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest";
         const auth = "Bearer " + req.safaricom_access_token;
-
         const timestamp = getTimestamp();
         const password = Buffer.from(
             process.env.BUSINESS_SHORT_CODE + process.env.PASS_KEY + timestamp
@@ -21,26 +27,30 @@ export const initiateSTKPush = async (req, res) => {
         const callback_url = `${process.env.NGROK_URL}/api/stkPushCallback/${Order_ID}`;
         console.log("Callback URL:", callback_url);
 
+        const payload = {
+            BusinessShortCode: process.env.BUSINESS_SHORT_CODE,
+            Password: password,
+            Timestamp: timestamp,
+            TransactionType: "CustomerPayBillOnline", // Use "CustomerBuyGoodsOnline" only if your shortcode supports it
+            Amount: amount,
+            PartyA: normalizedPhone,
+            PartyB: process.env.BUSINESS_SHORT_CODE,
+            PhoneNumber: normalizedPhone,
+            CallBackURL: callback_url,
+            AccountReference: "Scenius",
+            TransactionDesc: "Paid online",
+        };
+
+        console.log("STK Push Payload:", payload);
+
         request(
             {
-                url: url,
+                url,
                 method: "POST",
                 headers: {
                     Authorization: auth,
                 },
-                json: {
-                    BusinessShortCode: process.env.BUSINESS_SHORT_CODE,
-                    Password: password,
-                    Timestamp: timestamp,
-                    TransactionType: "CustomerBuyGoodsOnline",
-                    Amount: amount,
-                    PartyA: phone,
-                    PartyB: process.env.BUSINESS_SHORT_CODE,
-                    PhoneNumber: phone,
-                    CallBackURL: callback_url,
-                    AccountReference: "Scenius",
-                    TransactionDesc: "Paid online",
-                },
+                json: payload,
             },
             (err, response, body) => {
                 if (err) {
@@ -50,6 +60,11 @@ export const initiateSTKPush = async (req, res) => {
                         error: err.message,
                     });
                 }
+
+                if (body.errorCode || body.ResponseCode !== "0") {
+                    console.warn("Safaricom STK Push Failure:", body);
+                }
+
                 res.status(200).json(body);
             }
         );
@@ -110,8 +125,6 @@ export const stkPushCallback = async (req, res) => {
             TransactionDate,
         });
 
-        // You can save this data to DB here if needed
-
         res.json({ success: true });
     } catch (err) {
         console.error("Callback Handling Error:", err);
@@ -158,6 +171,11 @@ export const confirmPayment = async (req, res) => {
                         error: err.message,
                     });
                 }
+
+                if (body.errorCode || body.ResponseCode !== "0") {
+                    console.warn("Confirm Payment API failure:", body);
+                }
+
                 res.status(200).json(body);
             }
         );
