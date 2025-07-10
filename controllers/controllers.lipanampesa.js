@@ -106,7 +106,7 @@ export const stkPushCallback = async (req, res) => {
 
 export const confirmPayment = async (req, res) => {
     try {
-        const url = "https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query";
+        const url = "https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query";
         const auth = "Bearer " + req.safaricom_access_token;
 
         const timestamp = getTimestamp();
