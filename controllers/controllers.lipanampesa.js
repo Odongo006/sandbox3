@@ -18,9 +18,7 @@ export const initiateSTKPush = async (req, res) => {
             process.env.BUSINESS_SHORT_CODE + process.env.PASS_KEY + timestamp
         ).toString('base64');
 
-        // Create callback URL using env NGROK_URL (recommended over ngrok.connect each time)
         const callback_url = `${process.env.NGROK_URL}/api/stkPushCallback/${Order_ID}`;
-
         console.log("Callback URL:", callback_url);
 
         request(
@@ -64,22 +62,40 @@ export const initiateSTKPush = async (req, res) => {
     }
 };
 
+// @desc handle stk callback
+// @method POST
+// @route /stkPushCallback/:Order_ID
+// @access public
 export const stkPushCallback = async (req, res) => {
     try {
         const { Order_ID } = req.params;
+
+        const callback = req.body?.Body?.stkCallback;
+        if (!callback) {
+            console.error("Invalid callback payload received:", req.body);
+            return res.status(400).json({ message: "Malformed callback payload" });
+        }
+
         const {
             MerchantRequestID,
             CheckoutRequestID,
             ResultCode,
             ResultDesc,
             CallbackMetadata,
-        } = req.body.Body.stkCallback;
+        } = callback;
 
-        const meta = Object.values(CallbackMetadata.Item);
-        const PhoneNumber = meta.find((o) => o.Name === 'PhoneNumber')?.Value?.toString();
-        const Amount = meta.find((o) => o.Name === 'Amount')?.Value?.toString();
-        const MpesaReceiptNumber = meta.find((o) => o.Name === 'MpesaReceiptNumber')?.Value?.toString();
-        const TransactionDate = meta.find((o) => o.Name === 'TransactionDate')?.Value?.toString();
+        let PhoneNumber = 'N/A';
+        let Amount = 'N/A';
+        let MpesaReceiptNumber = 'N/A';
+        let TransactionDate = 'N/A';
+
+        if (CallbackMetadata?.Item) {
+            const meta = Object.values(CallbackMetadata.Item);
+            PhoneNumber = meta.find((o) => o.Name === 'PhoneNumber')?.Value?.toString() || 'N/A';
+            Amount = meta.find((o) => o.Name === 'Amount')?.Value?.toString() || 'N/A';
+            MpesaReceiptNumber = meta.find((o) => o.Name === 'MpesaReceiptNumber')?.Value?.toString() || 'N/A';
+            TransactionDate = meta.find((o) => o.Name === 'TransactionDate')?.Value?.toString() || 'N/A';
+        }
 
         console.log("-".repeat(20), " CALLBACK OUTPUT ", "-".repeat(20));
         console.log({
@@ -94,6 +110,8 @@ export const stkPushCallback = async (req, res) => {
             TransactionDate,
         });
 
+        // You can save this data to DB here if needed
+
         res.json({ success: true });
     } catch (err) {
         console.error("Callback Handling Error:", err);
@@ -104,6 +122,10 @@ export const stkPushCallback = async (req, res) => {
     }
 };
 
+// @desc confirm payment status
+// @method POST
+// @route /confirmPayment/:CheckoutRequestID
+// @access public
 export const confirmPayment = async (req, res) => {
     try {
         const url = "https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query";
@@ -147,4 +169,3 @@ export const confirmPayment = async (req, res) => {
         });
     }
 };
-
