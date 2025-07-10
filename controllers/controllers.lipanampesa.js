@@ -34,7 +34,7 @@ export const initiateSTKPush = async (req, res) => {
             TransactionType: "CustomerBuyGoodsOnline", // Use "CustomerBuyGoodsOnline" only if your shortcode supports it
             Amount: amount,
             PartyA: normalizedPhone,
-            PartyB: process.env.BUSINESS_SHORT_CODE,
+            PartyB: process.env.TILL_NUMBER,
             PhoneNumber: normalizedPhone,
             CallBackURL: callback_url,
             AccountReference: "Scenius",
