@@ -31,7 +31,7 @@ export const initiateSTKPush = async (req, res) => {
             BusinessShortCode: process.env.BUSINESS_SHORT_CODE,
             Password: password,
             Timestamp: timestamp,
-            TransactionType: "CustomerPayBillOnline", // Use "CustomerBuyGoodsOnline" only if your shortcode supports it
+            TransactionType: "CustomerBuyGoodsOnline", // Use "CustomerBuyGoodsOnline" only if your shortcode supports it
             Amount: amount,
             PartyA: normalizedPhone,
             PartyB: process.env.BUSINESS_SHORT_CODE,
