@@ -1,6 +1,8 @@
 import request from "request";
 import 'dotenv/config';
 import { getTimestamp } from "../Utils/utils.timestamp.js";
+import Transaction from "../models/Transaction.js";
+
 
 // @desc initiate stk push
 // @method POST
@@ -82,58 +84,66 @@ export const initiateSTKPush = async (req, res) => {
 // @route /stkPushCallback/:Order_ID
 // @access public
 export const stkPushCallback = async (req, res) => {
-    try {
-        const { Order_ID } = req.params;
+  try {
+    const { Order_ID } = req.params;
 
-        const callback = req.body?.Body?.stkCallback;
-        if (!callback) {
-            console.error("Invalid callback payload received:", req.body);
-            return res.status(400).json({ message: "Malformed callback payload" });
-        }
-
-        const {
-            MerchantRequestID,
-            CheckoutRequestID,
-            ResultCode,
-            ResultDesc,
-            CallbackMetadata,
-        } = callback;
-
-        let PhoneNumber = 'N/A';
-        let Amount = 'N/A';
-        let MpesaReceiptNumber = 'N/A';
-        let TransactionDate = 'N/A';
-
-        if (CallbackMetadata?.Item) {
-            const meta = Object.values(CallbackMetadata.Item);
-            PhoneNumber = meta.find((o) => o.Name === 'PhoneNumber')?.Value?.toString() || 'N/A';
-            Amount = meta.find((o) => o.Name === 'Amount')?.Value?.toString() || 'N/A';
-            MpesaReceiptNumber = meta.find((o) => o.Name === 'MpesaReceiptNumber')?.Value?.toString() || 'N/A';
-            TransactionDate = meta.find((o) => o.Name === 'TransactionDate')?.Value?.toString() || 'N/A';
-        }
-
-        console.log("-".repeat(20), " CALLBACK OUTPUT ", "-".repeat(20));
-        console.log({
-            Order_ID,
-            MerchantRequestID,
-            CheckoutRequestID,
-            ResultCode,
-            ResultDesc,
-            PhoneNumber,
-            Amount,
-            MpesaReceiptNumber,
-            TransactionDate,
-        });
-
-        res.json({ success: true });
-    } catch (err) {
-        console.error("Callback Handling Error:", err);
-        res.status(500).json({
-            message: "Failed to process callback",
-            error: err.message,
-        });
+    const callback = req.body?.Body?.stkCallback;
+    if (!callback) {
+      console.error("Invalid callback payload received:", req.body);
+      return res.status(400).json({ message: "Malformed callback payload" });
     }
+
+    const {
+      MerchantRequestID,
+      CheckoutRequestID,
+      ResultCode,
+      ResultDesc,
+      CallbackMetadata,
+    } = callback;
+
+    let PhoneNumber = 'N/A';
+    let Amount = 'N/A';
+    let MpesaReceiptNumber = 'N/A';
+    let TransactionDate = 'N/A';
+
+    if (CallbackMetadata?.Item) {
+      const meta = Object.values(CallbackMetadata.Item);
+      PhoneNumber = meta.find((o) => o.Name === 'PhoneNumber')?.Value?.toString() || 'N/A';
+      Amount = meta.find((o) => o.Name === 'Amount')?.Value?.toString() || 'N/A';
+      MpesaReceiptNumber = meta.find((o) => o.Name === 'MpesaReceiptNumber')?.Value?.toString() || 'N/A';
+      TransactionDate = meta.find((o) => o.Name === 'TransactionDate')?.Value?.toString() || 'N/A';
+    }
+
+    // Log data for visibility
+    const transactionData = {
+      Order_ID,
+      MerchantRequestID,
+      CheckoutRequestID,
+      ResultCode,
+      ResultDesc,
+      PhoneNumber,
+      Amount,
+      MpesaReceiptNumber,
+      TransactionDate,
+    };
+
+    console.log("-".repeat(20), " CALLBACK OUTPUT ", "-".repeat(20));
+    console.log(transactionData);
+
+    // Save to MongoDB
+    await Transaction.create(transactionData);
+
+    // Respond to Safaricom API with 200 OK
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Callback Handling Error:", err);
+    res.status(500).json({
+      message: "Failed to process callback",
+      error: err.message,
+    });
+  }
 };
+
 
 // @desc confirm payment status
 // @method POST
