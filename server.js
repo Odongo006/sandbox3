@@ -23,7 +23,7 @@ import lipaNaMpesaRoutes from "./routes/routes.lipanampesa.js";
 app.use('/api', lipaNaMpesaRoutes);
 
 // ✅ Import the Transaction model
-import Transaction from "./models/transactions.model.js"; // adjust path if different
+import Transaction from "./models/Transaction.js"; // adjust path if different
 
 // ✅ Add a GET endpoint to check transaction status
 app.get('/api/transactions/checkout/:checkoutId', async (req, res) => {
