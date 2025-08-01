@@ -19,6 +19,7 @@
     "express-fileupload": "^1.5.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.16.4",
+    "multer": "^2.0.2",
     "ngrok": "^4.3.3",
     "request": "^2.88.2",
     "validator": "^13.15.15"
