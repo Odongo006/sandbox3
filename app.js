@@ -19,13 +19,26 @@ const app = express();
 config({ path: "./config/config.env" });
 
 // CORS Config
+const allowedOrigins = [
+  "https://wekasmart.onrender.com",
+  process.env.FRONTEND_URL, // make sure this is set
+].filter(Boolean); // remove falsy values like undefined
+
 app.use(
   cors({
-    origin: ["https://wekasmart.onrender.com", process.env.FRONTEND_URL],
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.log(`❌ Blocked by CORS: ${origin}`);
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
+
 
 // General Middleware
 app.use(express.json());
