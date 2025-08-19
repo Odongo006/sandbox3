@@ -1,54 +1,67 @@
 // server.js
-import mongoose from "mongoose";
-import "dotenv/config";
-import app from "./app.js";
-import Transaction from "./models/Transaction.js";
-import { v2 as cloudinary } from "cloudinary";
-// ✅ Cloudinary Configuration
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLIENT_NAME,
-  api_key: process.env.CLOUDINARY_CLIENT_API,
-  api_secret: process.env.CLOUDINARY_CLIENT_SECRET,
-});
+import express from "express";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import fileUpload from "express-fileupload";
+import { config } from "dotenv";
 
+// Database + Middlewares
+import dbConnection from "./database/dbConnection.js";
+import { errorMiddleware } from "./middlewares/error.js";
 
-// ✅ MongoDB Connection
-mongoose
-  .connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
+// Routes
+import lipaNaMpesaRoutes from "./routes/routes.lipanampesa.js";
+
+// Initialize express
+const app = express();
+
+// Load environment variables
+config({ path: "./config/config.env" });
+
+// CORS Config
+const allowedOrigins = [
+  "https://wekasmart.onrender.com",
+  process.env.FRONTEND_URL, // must be set in your .env file
+].filter(Boolean); // remove falsy values like undefined
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.log(`❌ Blocked by CORS: ${origin}`);
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
   })
-  .then(() => console.log("✅ MongoDB connected via Mongoose"))
-  .catch((err) => {
-    console.error("❌ MongoDB connection error:", err);
-    process.exit(1);
-  });
+);
 
-// ✅ Optional Standalone Transaction Status Route
-app.get("/api/transactions/checkout/:checkoutId", async (req, res) => {
-  try {
-    const txn = await Transaction.findOne({
-      CheckoutRequestID: req.params.checkoutId,
-    });
+// General Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
-    if (!txn) {
-      return res.status(404).json({
-        success: false,
-        message: "Transaction not found",
-      });
-    }
+app.use(
+  fileUpload({
+    useTempFiles: true,
+    tempFileDir: "/tmp/",
+  })
+);
 
-    res.json({ success: true, transaction: txn });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
-  }
-});
+// All Routes
+app.use("/api/v1/mpesa", lipaNaMpesaRoutes);
 
-// ✅ Start Server
-const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => {
-  console.log(`🚀 App is running on http://localhost:${PORT}`);
+// Database Connection
+dbConnection();
+
+// Global Error Middleware
+app.use(errorMiddleware);
+
+// Start server
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`🚀 App listening on port ${port}`);
 });
