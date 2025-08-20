@@ -12,7 +12,6 @@ export const initiateSTKPush = async (req, res) => {
     try {
         const { amount, phone, Order_ID } = req.body;
 
-        // Normalize phone to 2547XXXXXXXX
         const normalizedPhone = phone.startsWith("0")
             ? "254" + phone.slice(1)
             : phone.startsWith("+254")
@@ -33,7 +32,7 @@ export const initiateSTKPush = async (req, res) => {
             BusinessShortCode: process.env.BUSINESS_SHORT_CODE,
             Password: password,
             Timestamp: timestamp,
-            TransactionType: "CustomerBuyGoodsOnline", // Use "CustomerBuyGoodsOnline" only if your shortcode supports it
+            TransactionType: "CustomerBuyGoodsOnline",
             Amount: amount,
             PartyA: normalizedPhone,
             PartyB: process.env.TILL_NUMBER,
@@ -43,24 +42,17 @@ export const initiateSTKPush = async (req, res) => {
             TransactionDesc: "Paid online",
         };
 
-        console.log("STK Push Payload:", payload);
-
         request(
             {
                 url,
                 method: "POST",
-                headers: {
-                    Authorization: auth,
-                },
+                headers: { Authorization: auth },
                 json: payload,
             },
             (err, response, body) => {
                 if (err) {
                     console.error("STK Push Error:", err);
-                    return res.status(503).json({
-                        message: "Error with the STK Push",
-                        error: err.message,
-                    });
+                    return res.status(503).json({ message: "Error with the STK Push", error: err.message });
                 }
 
                 if (body.errorCode || body.ResponseCode !== "0") {
@@ -72,12 +64,10 @@ export const initiateSTKPush = async (req, res) => {
         );
     } catch (err) {
         console.error("Unhandled STK Push Error:", err);
-        res.status(500).json({
-            message: "Server error during STK Push",
-            error: err.message,
-        });
+        res.status(500).json({ message: "Server error during STK Push", error: err.message });
     }
 };
+
 
 // @desc handle stk callback
 // @method POST
@@ -86,8 +76,8 @@ export const initiateSTKPush = async (req, res) => {
 export const stkPushCallback = async (req, res) => {
   try {
     const { Order_ID } = req.params;
-
     const callback = req.body?.Body?.stkCallback;
+
     if (!callback) {
       console.error("Invalid callback payload received:", req.body);
       return res.status(400).json({ message: "Malformed callback payload" });
@@ -114,7 +104,9 @@ export const stkPushCallback = async (req, res) => {
       TransactionDate = meta.find((o) => o.Name === 'TransactionDate')?.Value?.toString() || 'N/A';
     }
 
-    // Log data for visibility
+    // Map ResultCode into status
+    const status = ResultCode === 0 ? "confirmed" : "failed";
+
     const transactionData = {
       Order_ID,
       MerchantRequestID,
@@ -125,27 +117,28 @@ export const stkPushCallback = async (req, res) => {
       Amount,
       MpesaReceiptNumber,
       TransactionDate,
+      status,  // 👈 NEW FIELD
     };
 
     console.log("-".repeat(20), " CALLBACK OUTPUT ", "-".repeat(20));
     console.log(transactionData);
 
-    // Save to MongoDB
-    await Transaction.create(transactionData);
+    // Save/update MongoDB transaction
+    await Transaction.findOneAndUpdate(
+      { CheckoutRequestID },
+      transactionData,
+      { upsert: true, new: true }
+    );
 
-    // Respond to Safaricom API with 200 OK
     res.json({ success: true });
   } catch (err) {
     console.error("Callback Handling Error:", err);
-    res.status(500).json({
-      message: "Failed to process callback",
-      error: err.message,
-    });
+    res.status(500).json({ message: "Failed to process callback", error: err.message });
   }
 };
 
 
-// @desc confirm payment status
+// @desc confirm payment status (query Safaricom directly)
 // @method POST
 // @route /confirmPayment/:CheckoutRequestID
 // @access public
@@ -153,7 +146,6 @@ export const confirmPayment = async (req, res) => {
     try {
         const url = "https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query";
         const auth = "Bearer " + req.safaricom_access_token;
-
         const timestamp = getTimestamp();
         const password = Buffer.from(
             process.env.BUSINESS_SHORT_CODE + process.env.PASS_KEY + timestamp
@@ -163,9 +155,7 @@ export const confirmPayment = async (req, res) => {
             {
                 url,
                 method: "POST",
-                headers: {
-                    Authorization: auth,
-                },
+                headers: { Authorization: auth },
                 json: {
                     BusinessShortCode: process.env.BUSINESS_SHORT_CODE,
                     Password: password,
@@ -176,14 +166,7 @@ export const confirmPayment = async (req, res) => {
             (err, response, body) => {
                 if (err) {
                     console.error("Confirm Payment Error:", err);
-                    return res.status(503).json({
-                        message: "Error confirming payment",
-                        error: err.message,
-                    });
-                }
-
-                if (body.errorCode || body.ResponseCode !== "0") {
-                    console.warn("Confirm Payment API failure:", body);
+                    return res.status(503).json({ message: "Error confirming payment", error: err.message });
                 }
 
                 res.status(200).json(body);
@@ -191,9 +174,32 @@ export const confirmPayment = async (req, res) => {
         );
     } catch (err) {
         console.error("Unhandled Confirm Payment Error:", err);
-        res.status(500).json({
-            message: "Server error during payment confirmation",
-            error: err.message,
-        });
+        res.status(500).json({ message: "Server error during payment confirmation", error: err.message });
     }
+};
+
+
+// @desc get payment status from DB (for frontend polling)
+// @method GET
+// @route /payment-status/:CheckoutRequestID
+// @access public
+export const getPaymentStatus = async (req, res) => {
+  try {
+    const { CheckoutRequestID } = req.params;
+    const tx = await Transaction.findOne({ CheckoutRequestID });
+
+    if (!tx) {
+      return res.json({ status: "pending" });
+    }
+
+    return res.json({
+      status: tx.status,           // confirmed | failed | pending
+      amount: tx.Amount,
+      phone: tx.PhoneNumber,
+      checkoutRequestID: tx.CheckoutRequestID,
+    });
+  } catch (err) {
+    console.error("Payment status error:", err);
+    res.status(500).json({ status: "error", error: err.message });
+  }
 };

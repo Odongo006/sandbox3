@@ -9,13 +9,18 @@ import {
 
 import { accessToken } from "../middlewares/middlewares.generateAccessToken.js";
 
-// Original routes
-router.route('/stkPush').post(accessToken, initiateSTKPush);
-router.route('/stkPushCallback/:Order_ID').post(stkPushCallback);
-router.route('/confirmPayment/:CheckoutRequestID').post(accessToken, confirmPayment);
+// ✅ Route to initiate STK push
+router.post('/stkPush', accessToken, initiateSTKPush);
 
-// ✅ New route for frontend feedback polling
-router.route('/payment-status/:CheckoutRequestID').get(async (req, res) => {
+// ✅ Safaricom will call this after user enters PIN
+// Note: remove `:Order_ID` since Safaricom does NOT send it in callback URL
+router.post('/stkPushCallback', stkPushCallback);
+
+// ✅ Route to manually confirm payment by CheckoutRequestID
+router.post('/confirmPayment/:CheckoutRequestID', accessToken, confirmPayment);
+
+// ✅ New route for frontend polling/checking payment status
+router.get('/payment-status/:CheckoutRequestID', async (req, res) => {
   const { CheckoutRequestID } = req.params;
 
   try {
@@ -23,10 +28,16 @@ router.route('/payment-status/:CheckoutRequestID').get(async (req, res) => {
 
     const transaction = await Transaction.findOne({ CheckoutRequestID });
 
-    if (transaction && transaction.ResultCode === 0) {
-      res.json({ status: "confirmed" });
+    if (!transaction) {
+      return res.json({ status: "not_found" });
+    }
+
+    if (transaction.ResultCode === 0) {
+      return res.json({ status: "confirmed" });
+    } else if (transaction.ResultCode) {
+      return res.json({ status: "failed", code: transaction.ResultCode });
     } else {
-      res.json({ status: "pending" });
+      return res.json({ status: "pending" });
     }
   } catch (err) {
     console.error("Error checking payment status:", err);
