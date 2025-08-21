@@ -75,65 +75,57 @@ export const initiateSTKPush = async (req, res) => {
 // @access public
 export const stkPushCallback = async (req, res) => {
   try {
-    const { Order_ID } = req.params;
-    const callback = req.body?.Body?.stkCallback;
+    const callbackData = req.body;
 
-    if (!callback) {
-      console.error("Invalid callback payload received:", req.body);
-      return res.status(400).json({ message: "Malformed callback payload" });
+    console.log("✅ STK Callback Received:", JSON.stringify(callbackData, null, 2));
+
+    const { Body } = callbackData;
+    const stkCallback = Body?.stkCallback;
+
+    if (!stkCallback) {
+      return res.status(400).json({ error: "Invalid callback data" });
     }
 
-    const {
-      MerchantRequestID,
-      CheckoutRequestID,
-      ResultCode,
-      ResultDesc,
-      CallbackMetadata,
-    } = callback;
+    const { CheckoutRequestID, ResultCode, ResultDesc } = stkCallback;
 
-    let PhoneNumber = 'N/A';
-    let Amount = 'N/A';
-    let MpesaReceiptNumber = 'N/A';
-    let TransactionDate = 'N/A';
+    // Safaricom only provides MpesaReceiptNumber if ResultCode === 0
+    let MpesaReceiptNumber = null;
+    let TransactionDate = null;
+    let PhoneNumber = null;
+    let Amount = null;
 
-    if (CallbackMetadata?.Item) {
-      const meta = Object.values(CallbackMetadata.Item);
-      PhoneNumber = meta.find((o) => o.Name === 'PhoneNumber')?.Value?.toString() || 'N/A';
-      Amount = meta.find((o) => o.Name === 'Amount')?.Value?.toString() || 'N/A';
-      MpesaReceiptNumber = meta.find((o) => o.Name === 'MpesaReceiptNumber')?.Value?.toString() || 'N/A';
-      TransactionDate = meta.find((o) => o.Name === 'TransactionDate')?.Value?.toString() || 'N/A';
+    if (ResultCode === 0) {
+      const meta = stkCallback.CallbackMetadata?.Item || [];
+      MpesaReceiptNumber = meta.find(i => i.Name === "MpesaReceiptNumber")?.Value || null;
+      TransactionDate = meta.find(i => i.Name === "TransactionDate")?.Value || null;
+      PhoneNumber = meta.find(i => i.Name === "PhoneNumber")?.Value || null;
+      Amount = meta.find(i => i.Name === "Amount")?.Value || null;
     }
 
-    // Map ResultCode into status
-    const status = ResultCode === 0 ? "confirmed" : "failed";
-
-    const transactionData = {
-      Order_ID,
-      MerchantRequestID,
-      CheckoutRequestID,
-      ResultCode,
-      ResultDesc,
-      PhoneNumber,
-      Amount,
-      MpesaReceiptNumber,
-      TransactionDate,
-      status,  // 👈 NEW FIELD
-    };
-
-    console.log("-".repeat(20), " CALLBACK OUTPUT ", "-".repeat(20));
-    console.log(transactionData);
-
-    // Save/update MongoDB transaction
-    await Transaction.findOneAndUpdate(
+    // ✅ Update transaction in DB
+    const updatedTransaction = await Transaction.findOneAndUpdate(
       { CheckoutRequestID },
-      transactionData,
-      { upsert: true, new: true }
+      {
+        ResultCode,
+        ResultDesc,
+        MpesaReceiptNumber,
+        TransactionDate,
+        PhoneNumber,
+        Amount,
+      },
+      { new: true } // return updated doc
     );
 
-    res.json({ success: true });
+    if (!updatedTransaction) {
+      console.warn("⚠️ Transaction not found for CheckoutRequestID:", CheckoutRequestID);
+    }
+
+    // Safaricom expects a 200 response, even if you don’t find transaction
+    res.json({ message: "Callback received successfully" });
+
   } catch (err) {
-    console.error("Callback Handling Error:", err);
-    res.status(500).json({ message: "Failed to process callback", error: err.message });
+    console.error("❌ Error handling STK callback:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
