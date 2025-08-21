@@ -25,7 +25,7 @@ export const initiateSTKPush = async (req, res) => {
             process.env.BUSINESS_SHORT_CODE + process.env.PASS_KEY + timestamp
         ).toString('base64');
 
-        const callback_url = `${process.env.NGROK_URL}/api/stkPushCallback/${Order_ID}`;
+        const callback_url = `${process.env.NGROK_URL}/api/stkPushCallback`;
         console.log("Callback URL:", callback_url);
 
         const payload = {
@@ -42,26 +42,38 @@ export const initiateSTKPush = async (req, res) => {
             TransactionDesc: "Paid online",
         };
 
-        request(
-            {
-                url,
-                method: "POST",
-                headers: { Authorization: auth },
-                json: payload,
-            },
-            (err, response, body) => {
-                if (err) {
-                    console.error("STK Push Error:", err);
-                    return res.status(503).json({ message: "Error with the STK Push", error: err.message });
-                }
+request(
+  {
+    url,
+    method: "POST",
+    headers: { Authorization: auth },
+    json: payload,
+  },
+  async (err, response, body) => {
+    if (err) {
+      console.error("STK Push Error:", err);
+      return res.status(503).json({ message: "Error with the STK Push", error: err.message });
+    }
 
-                if (body.errorCode || body.ResponseCode !== "0") {
-                    console.warn("Safaricom STK Push Failure:", body);
-                }
+    if (body.errorCode || body.ResponseCode !== "0") {
+      console.warn("Safaricom STK Push Failure:", body);
+    }
 
-                res.status(200).json(body);
-            }
-        );
+    // ✅ Save transaction immediately
+    if (body.CheckoutRequestID) {
+      await Transaction.create({
+        Order_ID,
+        MerchantRequestID: body.MerchantRequestID,
+        CheckoutRequestID: body.CheckoutRequestID,
+        Amount: amount,
+        PhoneNumber: normalizedPhone
+      });
+    }
+
+    res.status(200).json(body);
+  }
+);
+
     } catch (err) {
         console.error("Unhandled STK Push Error:", err);
         res.status(500).json({ message: "Server error during STK Push", error: err.message });
