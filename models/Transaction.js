@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const transactionSchema = new mongoose.Schema({
-  Order_ID: { type: String},
+  Order_ID: { type: String, required: false },
   MerchantRequestID: String,
   CheckoutRequestID: String,
   ResultCode: Number,
