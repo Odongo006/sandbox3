@@ -10,9 +10,12 @@ const transactionSchema = new mongoose.Schema({
   TransactionDate: String,
   PhoneNumber: String,
   Amount: String,
+  status: {
+    type: String,
+    enum: ["pending", "confirmed", "failed"],
+    default: "pending",
+  },
 }, { timestamps: true });
 
 const Transaction = mongoose.model("Transaction", transactionSchema);
-
-// ✅ This line is critical for ES Modules
 export default Transaction;

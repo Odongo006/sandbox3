@@ -85,61 +85,65 @@ request(
 // @method POST
 // @route /stkPushCallback/:Order_ID
 // @access public
+// controllers.lipanampesa.js
 export const stkPushCallback = async (req, res) => {
+  console.log("📩 STK Callback received!");
+  console.log("Raw Callback Body:", JSON.stringify(req.body, null, 2));
+
   try {
-    const callbackData = req.body;
+    const callback = req.body.Body.stkCallback;
+    console.log("✅ Parsed Callback:", callback);
 
-    console.log("✅ STK Callback Received:", JSON.stringify(callbackData, null, 2));
+    const {
+      MerchantRequestID,
+      CheckoutRequestID,
+      ResultCode,
+      ResultDesc,
+      CallbackMetadata,
+    } = callback;
 
-    const { Body } = callbackData;
-    const stkCallback = Body?.stkCallback;
+    console.log("🔹 ResultCode:", ResultCode, " | ResultDesc:", ResultDesc);
 
-    if (!stkCallback) {
-      return res.status(400).json({ error: "Invalid callback data" });
+    let MpesaReceiptNumber, TransactionDate, PhoneNumber, Amount;
+
+    if (CallbackMetadata) {
+      CallbackMetadata.Item.forEach((item) => {
+        console.log("➡️ Metadata:", item);
+        if (item.Name === "MpesaReceiptNumber") MpesaReceiptNumber = item.Value;
+        if (item.Name === "TransactionDate") TransactionDate = item.Value;
+        if (item.Name === "PhoneNumber") PhoneNumber = item.Value;
+        if (item.Name === "Amount") Amount = item.Value;
+      });
     }
 
-    const { CheckoutRequestID, ResultCode, ResultDesc } = stkCallback;
+    // Save or update in DB
+    const Transaction = (await import("../models/Transaction.js")).default;
 
-    // Safaricom only provides MpesaReceiptNumber if ResultCode === 0
-    let MpesaReceiptNumber = null;
-    let TransactionDate = null;
-    let PhoneNumber = null;
-    let Amount = null;
+await Transaction.findOneAndUpdate(
+  { CheckoutRequestID },
+  {
+    MerchantRequestID,
+    CheckoutRequestID,
+    ResultCode,
+    ResultDesc,
+    MpesaReceiptNumber,
+    TransactionDate,
+    PhoneNumber,
+    Amount,
+    status: ResultCode === 0 ? "confirmed" : "failed",   // ✅ status logic
+  },
+  { upsert: true, new: true }
+);
 
-    if (ResultCode === 0) {
-      const meta = stkCallback.CallbackMetadata?.Item || [];
-      MpesaReceiptNumber = meta.find(i => i.Name === "MpesaReceiptNumber")?.Value || null;
-      TransactionDate = meta.find(i => i.Name === "TransactionDate")?.Value || null;
-      PhoneNumber = meta.find(i => i.Name === "PhoneNumber")?.Value || null;
-      Amount = meta.find(i => i.Name === "Amount")?.Value || null;
-    }
+    console.log("💾 Transaction saved/updated successfully!");
 
-    // ✅ Update transaction in DB
-    const updatedTransaction = await Transaction.findOneAndUpdate(
-      { CheckoutRequestID },
-      {
-        ResultCode,
-        ResultDesc,
-        MpesaReceiptNumber,
-        TransactionDate,
-        PhoneNumber,
-        Amount,
-      },
-      { new: true } // return updated doc
-    );
-
-    if (!updatedTransaction) {
-      console.warn("⚠️ Transaction not found for CheckoutRequestID:", CheckoutRequestID);
-    }
-
-    // Safaricom expects a 200 response, even if you don’t find transaction
     res.json({ message: "Callback received successfully" });
-
-  } catch (err) {
-    console.error("❌ Error handling STK callback:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+  } catch (error) {
+    console.error("❌ Error handling STK Callback:", error);
+    res.status(500).json({ error: "Server error in stkPushCallback" });
   }
 };
+
 
 
 // @desc confirm payment status (query Safaricom directly)
